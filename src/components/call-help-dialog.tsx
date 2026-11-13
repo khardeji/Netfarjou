@@ -63,8 +63,8 @@ export function CallHelpDialog({ open, onOpenChange, reason }: { open: boolean; 
         {ios && reason === 'blocked' && (
           <ol className="space-y-2">
             <Step n={1} icon={<Smartphone size={14} />} title={t('Ouvrez le site dans Safari')} text={`${host} — ${t('pas depuis Messenger ou WhatsApp')}`} />
-            <Step n={2} icon={<Settings2 size={14} />} title={t('Touchez « aA » › Réglages du site web')} text={t('Le bouton « aA » est dans la barre d’adresse de Safari.')} />
-            <Step n={3} icon={<Mic size={14} />} title={t('Désactivez « Mode d’isolement »')} text={t('Puis rechargez la page et relancez l’appel. Autorisez le microphone quand Safari le demande.')} />
+            <Step n={2} icon={<Settings2 size={14} />} title={t('Touchez « aA » › Réglages du site web (Website Settings)')} text={t('Le bouton « aA » est dans la barre d’adresse de Safari.')} />
+            <Step n={3} icon={<Mic size={14} />} title={t('Éteignez l’interrupteur « Mode d’isolement » (Lockdown Mode) : il doit devenir gris')} text={t('Touchez OK (Done), rechargez la page puis relancez l’appel. Le micro doit rester sur Autoriser (Allow).')} />
           </ol>
         )}
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
