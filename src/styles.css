@@ -219,3 +219,4 @@
 .floating-call-bar{position:fixed;right:20px;bottom:20px;z-index:50;display:flex;align-items:center;gap:14px;padding:10px 14px;border-radius:10px;background:var(--card);border:1px solid var(--border);box-shadow:0 12px 30px rgba(0,0,0,.45);flex-wrap:wrap;max-width:calc(100vw - 40px)}
 .floating-call-volume{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted-foreground)}
 .floating-call-volume input{width:84px;accent-color:var(--primary);cursor:pointer}
+@media(max-width:640px){.match-showcase{padding-top:24px}.live-match-banner{padding:18px;gap:16px;flex-direction:column;align-items:stretch}.room-controls{flex-wrap:wrap}.friend-row{flex-wrap:wrap}.floating-call-bar{left:12px;right:12px;bottom:12px;max-width:none;justify-content:space-between}}

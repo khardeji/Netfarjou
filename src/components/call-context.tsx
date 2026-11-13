@@ -65,6 +65,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function connectToCall(payload: { callId: string; url: string; token: string }) {
+    if (typeof window !== 'undefined' && (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia)) {
+      throw new Error(
+        t('Les appels vocaux ne sont pas supportés dans ce navigateur. Ouvrez le site dans Safari ou Chrome et autorisez le microphone.'),
+      );
+    }
     if (roomRef.current) {
       await roomRef.current.disconnect();
       roomRef.current = null;
@@ -89,9 +94,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
     room.on(RoomEvent.ParticipantConnected, syncCount);
     room.on(RoomEvent.ParticipantDisconnected, syncCount);
     await room.connect(payload.url, payload.token);
-    await room.localParticipant.setMicrophoneEnabled(true);
+    let micMuted = false;
+    try {
+      await room.localParticipant.setMicrophoneEnabled(true);
+    } catch {
+      micMuted = true;
+      toast.error(t('Microphone refusé ou indisponible : vous êtes connecté en écoute seule.'));
+    }
     roomRef.current = room;
-    setActiveCall({ callId: payload.callId, muted: false, participants: room.remoteParticipants.size + 1 });
+    setActiveCall({ callId: payload.callId, muted: micMuted, participants: room.remoteParticipants.size + 1 });
   }
 
   async function beginCall(friendIds: string[], canCall: boolean) {

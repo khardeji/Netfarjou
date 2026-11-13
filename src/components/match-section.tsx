@@ -71,7 +71,7 @@ export function MatchSection({
 
       {liveMatch && (
         <div className="live-match-banner" role="region" aria-label={t('Match en direct')}>
-          <div className="space-y-2.5 min-w-0 flex-1">
+          <div className="space-y-2.5 min-w-0 flex-[1_1_260px]">
             <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-wider">
               <span className="inline-flex items-center gap-2 text-primary">
                 <span className="live-dot" />
@@ -85,7 +85,7 @@ export function MatchSection({
                 {liveMatch.participant_count}
               </span>
             </div>
-            <h3 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            <h3 className="text-xl sm:text-3xl font-bold tracking-tight break-words">
               {liveMatch.movies?.title}
             </h3>
             <p className="text-sm text-muted-foreground max-w-2xl">
@@ -96,16 +96,16 @@ export function MatchSection({
               {formatDate(liveMatch.starts_at)}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             {user ? (
-              <Button size="lg" asChild>
+              <Button size="lg" className="w-full sm:w-auto" asChild>
                 <Link to="/salle/$id" params={{ id: liveMatch.id }}>
                   <Play size={16} />
                   {t('Regarder le match')}
                 </Link>
               </Button>
             ) : (
-              <Button size="lg" asChild>
+              <Button size="lg" className="w-full sm:w-auto" asChild>
                 <Link to="/auth">
                   <Radio size={16} />
                   {t('Se connecter pour regarder')}
