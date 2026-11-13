@@ -52,6 +52,7 @@ function Profile() {
   const pending = friendships.filter(f => f.status === 'pending');
   const canCall = Boolean(data.callProviderAvailable);
   const incomingCalls = (data.calls ?? []).filter(c => c.id !== activeCall?.callId);
+  const inCall = !!activeCall || (data.calls ?? []).some(c => c.myState === 'joined');
   const beginCall = (friendIds: string[]) => beginCallCtx(friendIds, canCall);
   const joinCall = (callId: string) => joinCallCtx(callId, canCall);
   const catalogue = useQuery(catalogueOptions);
@@ -114,7 +115,7 @@ function Profile() {
           {pending.map(f => <article className="friend-row" key={f.id}><div className="min-w-0"><h3>{f.peer?.display_name || t('Mon compte')}</h3><p>{f.incoming ? t('Demande reçue') : t('Demande envoyée')}</p></div><div className="flex gap-2">{f.incoming && <Button disabled={busy} size="sm" onClick={() => answer(f.id, true)}><Check size={15}/>{t('Accepter')}</Button>}<Button disabled={busy} variant="ghost" size="icon" title={f.incoming ? t('Refuser') : t('Annuler')} aria-label={f.incoming ? t('Refuser') : t('Annuler')} onClick={() => answer(f.id, false)}><X size={16}/></Button></div></article>)}
         </section>
       </div>
-      <section className="friends-section"><div className="flex items-start justify-between gap-3 flex-wrap"><h2><Users size={20}/>{t('Mes amis')}<span className="friend-count">{accepted.length}</span></h2><Button disabled={!canCall || !selected.length || busy || !!activeCall} variant="outline" size="sm" onClick={() => { const friendUserIds = accepted.filter(f => selected.includes(f.id)).map(f => f.peer?.id).filter((id): id is string => Boolean(id)); void beginCall(friendUserIds); }}><Phone size={15}/>{t('Appel de groupe')}{selected.length > 0 && ` (${selected.length})`}</Button></div>
+      <section className="friends-section"><div className="flex items-start justify-between gap-3 flex-wrap"><h2><Users size={20}/>{t('Mes amis')}<span className="friend-count">{accepted.length}</span></h2><Button disabled={!canCall || !selected.length || busy || inCall} variant="outline" size="sm" onClick={() => { const friendUserIds = accepted.filter(f => selected.includes(f.id)).map(f => f.peer?.id).filter((id): id is string => Boolean(id)); void beginCall(friendUserIds); }}><Phone size={15}/>{t('Appel de groupe')}{selected.length > 0 && ` (${selected.length})`}</Button></div>
         {activeCall && (
           <div className="friend-row" role="status">
             <div className="min-w-0 flex-1">
@@ -139,7 +140,7 @@ function Profile() {
               <p>{c.members.map(m => m.display_name).join(', ')}</p>
             </div>
             <div className="flex gap-2">
-              <Button disabled={busy || !!activeCall} size="sm" onClick={() => void joinCall(c.id)}>
+              <Button disabled={busy || !!activeCall || (inCall && c.myState !== 'joined')} size="sm" onClick={() => void joinCall(c.id)}>
                 <Phone size={15}/>{t('Rejoindre')}
               </Button>
               <Button disabled={busy} variant="outline" size="sm" onClick={() => void hangUp(c.id, c.myState === 'invited' ? 'declined' : 'left')}>
@@ -149,7 +150,7 @@ function Profile() {
           </div>
         ))}
         {!accepted.length && <div className="friend-empty"><Users size={32}/><p>{t('Aucun ami pour le moment')}</p></div>}
-        {accepted.map(f => <article className="friend-row" key={f.id}><Checkbox aria-label={`${t('Sélectionner')} ${f.peer?.display_name || ''}`} checked={selected.includes(f.id)} onCheckedChange={value => setSelected(current => value ? [...current, f.id] : current.filter(id => id !== f.id))}/><div className="friend-avatar friend-avatar-small">{(f.peer?.display_name || 'N').slice(0, 1).toUpperCase()}</div><div className="min-w-0 flex-1"><h3>{f.peer?.display_name || t('Mon compte')}</h3><p className="break-all" dir="ltr">{f.peer?.friend_code}</p></div><Button disabled={!canCall || !f.peer?.id || busy || !!activeCall} variant="ghost" size="icon" title={canCall ? t('Appeler') : t('Appels indisponibles')} aria-label={t('Appeler')} onClick={() => { if (f.peer?.id) void beginCall([f.peer.id]); }}><Phone size={17}/></Button><Button disabled={busy} variant="ghost" size="icon" title={t('Retirer cet ami')} aria-label={t('Retirer cet ami')} onClick={() => { if (window.confirm(t('Retirer cet ami ?'))) void answer(f.id, false); }}><X size={16}/></Button></article>)}
+        {accepted.map(f => <article className="friend-row" key={f.id}><Checkbox aria-label={`${t('Sélectionner')} ${f.peer?.display_name || ''}`} checked={selected.includes(f.id)} onCheckedChange={value => setSelected(current => value ? [...current, f.id] : current.filter(id => id !== f.id))}/><div className="friend-avatar friend-avatar-small">{(f.peer?.display_name || 'N').slice(0, 1).toUpperCase()}</div><div className="min-w-0 flex-1"><h3>{f.peer?.display_name || t('Mon compte')}</h3><p className="break-all" dir="ltr">{f.peer?.friend_code}</p></div><Button disabled={!canCall || !f.peer?.id || busy || inCall} variant="ghost" size="icon" title={canCall ? (inCall ? t('Vous êtes déjà dans un appel') : t('Appeler')) : t('Appels indisponibles')} aria-label={t('Appeler')} onClick={() => { if (f.peer?.id) void beginCall([f.peer.id]); }}><Phone size={17}/></Button><Button disabled={busy} variant="ghost" size="icon" title={t('Retirer cet ami')} aria-label={t('Retirer cet ami')} onClick={() => { if (window.confirm(t('Retirer cet ami ?'))) void answer(f.id, false); }}><X size={16}/></Button></article>)}
         {!canCall && <div className="call-unavailable"><Mic size={18}/><div><h3>{t('Appels indisponibles')}</h3><p>{t('Le service audio privé n’est pas activé.')}</p></div></div>}<p className="flex items-center gap-2 text-xs text-muted-foreground mt-4"><ShieldCheck size={15}/>{t('Les appels seront réservés aux amis invités.')}</p>
       </section>
     </div>

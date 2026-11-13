@@ -112,12 +112,56 @@ export const getFriends = createServerFn({ method: 'POST' }).middleware([require
   };
 });
 
+const ALREADY_IN_CALL = 'Vous êtes déjà dans un appel. Raccrochez avant d’en lancer ou d’en rejoindre un autre.';
+
+type CallClient = {
+  from: (table: 'friend_calls' | 'friend_call_members') => any;
+};
+
+/** Returns the id of an active (not ended, not expired) call the user has already joined, if any. */
+async function findJoinedCall(supabase: CallClient, userId: string, exceptCallId?: string): Promise<string | null> {
+  const members = await supabase.from('friend_call_members').select('call_id').eq('user_id', userId).eq('state', 'joined');
+  const ids: string[] = ((members.data ?? []) as Array<{ call_id: string }>)
+    .map(m => m.call_id)
+    .filter(id => id !== exceptCallId);
+  if (!ids.length) return null;
+  const active = await supabase
+    .from('friend_calls')
+    .select('id')
+    .in('id', ids)
+    .is('ended_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .limit(1);
+  return ((active.data ?? []) as Array<{ id: string }>)[0]?.id ?? null;
+}
+
+/** A call needs at least 2 people who joined. When fewer remain, the call ends for everybody. */
+async function endCallIfTooSmall(supabase: CallClient, callId: string) {
+  const joined = await supabase.from('friend_call_members').select('user_id').eq('call_id', callId).eq('state', 'joined');
+  if (joined.error) return false;
+  if (((joined.data ?? []) as unknown[]).length >= 2) return false;
+  const endedAt = new Date().toISOString();
+  let ended = false;
+  if (process.env['SUPABASE_SERVICE_ROLE_KEY']) {
+    try {
+      const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+      const res = await supabaseAdmin.from('friend_calls').update({ ended_at: endedAt }).eq('id', callId).is('ended_at', null);
+      ended = !res.error;
+    } catch { /* Fall back to the user client below. */ }
+  }
+  if (!ended) {
+    await supabase.from('friend_calls').update({ ended_at: endedAt }).eq('id', callId).is('ended_at', null);
+  }
+  return true;
+}
+
 export const startFriendCall = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator(input => z.object({ friendIds: z.array(z.string().uuid()).min(1) }).parse(input))
   .handler(async ({ data, context }) => {
     const config = livekitConfig();
     if (!config) throw new Error('Le service audio privé n’est pas activé.');
+    if (await findJoinedCall(context.supabase as unknown as CallClient, context.userId)) throw new Error(ALREADY_IN_CALL);
     const [callRes, profileRes] = await Promise.all([
       context.supabase.rpc('create_friend_call', { _friends: data.friendIds }),
       context.supabase.from('profiles').select('display_name').eq('id', context.userId).maybeSingle(),
@@ -134,6 +178,7 @@ export const joinFriendCall = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const config = livekitConfig();
     if (!config) throw new Error('Le service audio privé n’est pas activé.');
+    if (await findJoinedCall(context.supabase as unknown as CallClient, context.userId, data.callId)) throw new Error(ALREADY_IN_CALL);
     const [callRes, memberRes, profileRes] = await Promise.all([
       context.supabase
         .from('friend_calls')
@@ -163,8 +208,19 @@ export const respondFriendCall = createServerFn({ method: 'POST' })
   .inputValidator(input => z.object({ callId: z.string().uuid(), state: z.enum(['declined', 'left']) }).parse(input))
   .handler(async ({ data, context }) => {
     const resp = await context.supabase.rpc('respond_friend_call', { _call: data.callId, _state: data.state });
-    if (resp.error) throw new Error(resp.error.message);
-    return { ok: true };
+    if (resp.error) {
+      // The call may already have been ended because the other participants left: that is not an error.
+      const stillActive = await context.supabase
+        .from('friend_calls')
+        .select('id')
+        .eq('id', data.callId)
+        .is('ended_at', null)
+        .maybeSingle();
+      if (stillActive.data) throw new Error(resp.error.message);
+      return { ok: true, ended: true };
+    }
+    const ended = await endCallIfTooSmall(context.supabase as unknown as CallClient, data.callId);
+    return { ok: true, ended };
   });
 
 export const addFriend = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator(input => friendCodeSchema.parse(input)).handler(async ({ data, context }) => {

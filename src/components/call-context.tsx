@@ -102,6 +102,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [callVolume, setCallVolumeState] = useState(1);
   const callVolumeRef = useRef(1);
   const roomRef = useRef<Room | null>(null);
+  const connectedAtRef = useRef(0);
   const audioHostRef = useRef<HTMLDivElement>(null);
 
   const friendsQuery = useQuery({
@@ -164,10 +165,19 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function connectToCall(payload: { callId: string; url: string; token: string }) {
-    if (typeof window !== 'undefined' && (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia)) {
-      throw new Error(
-        t('Les appels vocaux ne sont pas supportés dans ce navigateur. Ouvrez le site dans Safari ou Chrome et autorisez le microphone.'),
-      );
+    if (typeof window !== 'undefined') {
+      const hasWebRtc = Boolean(window.RTCPeerConnection || (window as unknown as { webkitRTCPeerConnection?: unknown }).webkitRTCPeerConnection);
+      if (!hasWebRtc) {
+        const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        throw new Error(
+          isIos
+            ? t('Votre iPhone bloque les appels (Mode d’isolement activé). Dans Safari, touchez « aA » › Réglages du site web › désactivez « Mode d’isolement » pour netfarjou.vercel.app, puis rechargez la page.')
+            : t('Les appels vocaux ne sont pas supportés dans ce navigateur. Ouvrez le site dans Safari ou Chrome.'),
+        );
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error(t('Le microphone est indisponible : ouvrez le site en HTTPS dans Safari ou Chrome.'));
+      }
     }
     if (roomRef.current) {
       await roomRef.current.disconnect();
@@ -191,7 +201,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setActiveCall((prev) => (prev ? { ...prev, participants: room.remoteParticipants.size + 1 } : prev));
     };
     room.on(RoomEvent.ParticipantConnected, syncCount);
-    room.on(RoomEvent.ParticipantDisconnected, syncCount);
+    room.on(RoomEvent.ParticipantDisconnected, () => {
+      syncCount();
+      // Everyone else left: the call is over for the last remaining person too.
+      if (room.remoteParticipants.size === 0) void leaveEndedCallRef.current(payload.callId);
+    });
     await room.connect(payload.url, payload.token);
     let micMuted = false;
     try {
@@ -201,8 +215,38 @@ export function CallProvider({ children }: { children: ReactNode }) {
       toast.error(t('Microphone refusé ou indisponible : vous êtes connecté en écoute seule.'));
     }
     roomRef.current = room;
+    connectedAtRef.current = Date.now();
     setActiveCall({ callId: payload.callId, muted: micMuted, participants: room.remoteParticipants.size + 1 });
   }
+
+  async function leaveLocally() {
+    if (roomRef.current) {
+      await roomRef.current.disconnect();
+      roomRef.current = null;
+    }
+    if (audioHostRef.current) audioHostRef.current.innerHTML = '';
+    setActiveCall(null);
+  }
+
+  const leaveEndedCallRef = useRef<(callId: string) => Promise<void>>(async () => {});
+  leaveEndedCallRef.current = async (callId: string) => {
+    await leaveLocally();
+    toast.info(t('L’appel est terminé.'));
+    try {
+      await respondCallFn({ data: { callId, state: 'left' } });
+    } catch { /* The call is already over. */ }
+    await cache.invalidateQueries({ queryKey: ['friends'] });
+  };
+
+  // The server ended the call (e.g. the other person hung up): disconnect this device as well.
+  useEffect(() => {
+    if (!activeCall || !friendsQuery.data) return;
+    if (friendsQuery.dataUpdatedAt <= connectedAtRef.current) return; // data fetched before this call existed
+    const stillActive = (friendsQuery.data.calls ?? []).some((c) => c.id === activeCall.callId);
+    if (!stillActive && !busy) {
+      void leaveLocally().then(() => toast.info(t('L’appel est terminé.')));
+    }
+  }, [friendsQuery.data, friendsQuery.dataUpdatedAt, activeCall?.callId]);
 
   async function beginCall(friendIds: string[], providerReady: boolean) {
     if (!providerReady || !friendIds.length) return;
