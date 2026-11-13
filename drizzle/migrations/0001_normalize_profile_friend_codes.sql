@@ -1,0 +1,3 @@
+ALTER TABLE public.profiles ALTER COLUMN friend_code SET DEFAULT ('NF-' || upper(replace(gen_random_uuid()::text, '-', '')));
+UPDATE public.profiles SET friend_code=upper(friend_code);
+CREATE OR REPLACE FUNCTION public.are_friends(a uuid,b uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$ SELECT (auth.uid() IN (a,b)) AND EXISTS (SELECT 1 FROM public.friendships WHERE status='accepted' AND ((requester_id=a AND recipient_id=b) OR (requester_id=b AND recipient_id=a))) $$;

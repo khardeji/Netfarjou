@@ -1,0 +1,19 @@
+import { t } from '@/lib/i18n';
+import { useTranslation } from 'react-i18next';
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { useState, type FormEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Plus } from 'lucide-react';
+import { useAuth } from '@/components/auth-context';
+import { Button } from '@/components/ui/button';
+import { headMeta } from '@/lib/cinema';
+import { supabase } from '@/integrations/supabase/client';
+export const Route = createFileRoute('/propositions')({ head: () => headMeta('La communauté', 'Proposez vos films préférés et retrouvez les décisions de la programmation Netfarjou.'), component: Suggestions });
+function Suggestions() {
+ useTranslation(); const { user } = useAuth(); const cache = useQueryClient(); const [busy, setBusy] = useState(false); const query = useQuery({ queryKey: ['suggestions', user?.id], enabled: !!user, queryFn: async () => { const { data, error } = await supabase.from('movie_suggestions').select('*').eq('user_id', user?.id ?? '').order('created_at', { ascending: false }); if (error)
+        throw error; return data; } }); async function submit(e: FormEvent<HTMLFormElement>) { e.preventDefault(); if (!user)
+    return; const target = e.currentTarget; const f = new FormData(target); setBusy(true); const { error } = await supabase.from('movie_suggestions').insert({ user_id: user.id, title: String(f.get('title')), year: Number(f.get('year')), genre: String(f.get('genre')), description: String(f.get('description')), personal_note: String(f.get('note')) }); setBusy(false); if (error) {
+    toast.error(error.message);
+    return;
+} toast.success(t("Votre proposition a \u00E9t\u00E9 envoy\u00E9e.")); target.reset(); cache.invalidateQueries({ queryKey: ['suggestions'] }); } return <main className="content-width standard-page"><div className="page-heading"><div className="section-kicker">{t("LA COMMUNAUT\u00C9 NETFARJOU")}</div><h1>{t("Le prochain film, c\u2019est vous.")}</h1><p>{t("Les histoires que vous aimez m\u00E9ritent d\u2019\u00EAtre partag\u00E9es.")}</p></div>{!user ? <div className="empty-state"><h3>{t("Un coup de c\u0153ur \u00E0 partager ?")}</h3><Button asChild><Link to="/auth">{t("Se connecter pour proposer un film")}</Link></Button></div> : <div className="suggestion-layout"><section><h2>{t("Proposer un film")}</h2><form onSubmit={submit}><div className="form-grid"><label className="field full-field">{t("Titre du film")}<input name="title" required placeholder={t("Votre coup de c\u0153ur")}/></label><label className="field">{t("Ann\u00E9e de sortie")}<input type="number" name="year" required min={1888} max={2100} defaultValue={2026}/></label><label className="field">{t("Genre")}<select name="genre">{['Drame', 'Science-fiction', 'Thriller', 'Comédie', 'Aventure', 'Documentaire', 'Animation'].map(g => <option key={g} value={g}>{t(g ?? "")} </option>)}</select></label><label className="field full-field">{t("Description (facultative)")}<textarea name="description"/></label><label className="field full-field">{t("Pourquoi le partager ? (facultatif)")}<textarea name="note"/></label></div><Button disabled={busy}><Plus />{busy ? t("Envoi\u2026") : t("Envoyer ma proposition")}</Button></form></section><section><h2>{t("Mes propositions")}</h2>{query.isLoading ? <p>{t("Chargement\u2026")}</p> : query.error ? <p>{t("Impossible de charger les propositions.")}</p> : query.data?.length ? query.data.map(s => <div className="suggestion-row" key={s.id}><div><h3>{s.title}</h3><p>{s.genre} · {s.year}</p></div><span className="suggestion-status">{t({ Pending: 'En attente', Accepted: 'Acceptée', Rejected: 'Refusée' }[s.status] ?? s.status)}</span></div>) : <p className="text-sm text-muted-foreground">{t("Vos propositions appara\u00EEtront ici.")}</p>}</section></div>}</main>; }

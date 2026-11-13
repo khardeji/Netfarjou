@@ -1,0 +1,18 @@
+# Cinéma en ligne
+- [x] Installer le logo fourni et favicon.ico, ajouter le carrousel et les pages de détails des films ; affichage mobile et navigation vérifiés.
+- [x] Attribuer l’administration à admin@gmail.com et ajouter trois films fictifs et trois séances de test dans ce remix ; accès administrateur vérifié.
+- [x] Ajouter un identifiant de profil partageable, les demandes d’amitié et leur acceptation.
+- [ ] Ajouter les appels audio privés entre amis et en groupe, avec invitations et commandes microphone — bloqué : activation du fournisseur audio refusée.
+- [ ] Conserver l’appel pendant la navigation et permettre de partager une séance entre amis sans contourner ses conditions d’accès — bloqué : fournisseur audio non activé.
+- [ ] Vérifier les demandes d’amitié, la confidentialité et un appel entre plusieurs comptes — bloqué : aucun compte confirmé dans ce remix ; fournisseur audio non activé.
+- [x] Détecter et enregistrer la durée exacte des vidéos locales et ajouter la détection des liens (YouTube dépend de l’autorisation d’intégration).
+- [x] Importer les vidéos locales avec compression et vérifier l’enregistrement : 38 s, 14 Mo réduits à 4,1 Mo.
+- [x] Première étape : comptes avec profils, administration protégée, films, programmation et inscriptions persistantes.
+- [x] Vérifier les neuf tests de règles, l’accueil, l’accès déconnecté et l’affichage mobile après le remix.
+- [x] Créer la salle Watch Together avec accès réservé, chat, présence et synchronisation vidéo.
+- [x] Attribuer l’administration au compte admin@gmail.com et vérifier ses accès.
+- [x] Ajouter trois films fictifs et une vidéo de démonstration autorisée avec leurs séances.
+- [x] Renommer l’application Netfarjou et traduire l’accueil, l’en-tête et le sélecteur de langue en français, anglais et arabe tunisien.
+- [ ] Vérifier les traductions sur les pages restantes (séances, mes séances, propositions, administration, salle).
+- [ ] Compléter la gestion administrative des utilisateurs et inscriptions.
+- [ ] Vérifier les parcours connectés, les traductions et l’affichage arabe ; le visionnage simultané attend une vidéo autorisée.
