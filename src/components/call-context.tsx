@@ -1,11 +1,14 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Room, RoomEvent, Track } from 'livekit-client';
-import { Mic, MicOff, Phone, PhoneOff, Volume2 } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneIncoming, PhoneOff, Volume2, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/components/auth-context';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 import { joinFriendCall, respondFriendCall, startFriendCall } from '@/lib/friends.functions';
+import { friendsOptions } from '@/lib/friends.queries';
 import { t } from '@/lib/i18n';
 
 export type ActiveCallState = {
@@ -27,7 +30,69 @@ type CallContextValue = {
 
 const CallContext = createContext<CallContextValue | null>(null);
 
+function startRingtone(): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const AudioCtx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return () => {};
+
+  let stopped = false;
+  let ctx: AudioContext | null = null;
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+
+  const playBurst = () => {
+    if (stopped) return;
+    try {
+      if (!ctx) ctx = new AudioCtx();
+      if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+      if (ctx.state !== 'running') return;
+
+      const now = ctx.currentTime;
+      const playTone = (startOffset: number, duration: number) => {
+        if (!ctx) return;
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+        osc1.frequency.setValueAtTime(440, now + startOffset);
+        osc2.frequency.setValueAtTime(480, now + startOffset);
+
+        gain.gain.setValueAtTime(0.0001, now + startOffset);
+        gain.gain.exponentialRampToValueAtTime(0.08, now + startOffset + 0.03);
+        gain.gain.setValueAtTime(0.08, now + startOffset + duration - 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + startOffset + duration);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start(now + startOffset);
+        osc2.start(now + startOffset);
+        osc1.stop(now + startOffset + duration);
+        osc2.stop(now + startOffset + duration);
+      };
+
+      playTone(0, 0.35);
+      playTone(0.5, 0.35);
+    } catch {
+      /* Ignore audio errors when autoplay is blocked. */
+    }
+  };
+
+  playBurst();
+  intervalId = setInterval(playBurst, 2600);
+
+  return () => {
+    stopped = true;
+    if (intervalId) clearInterval(intervalId);
+    if (ctx) void ctx.close().catch(() => {});
+  };
+}
+
 export function CallProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const cache = useQueryClient();
   const startCallFn = useServerFn(startFriendCall);
   const joinCallFn = useServerFn(joinFriendCall);
@@ -38,6 +103,40 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const callVolumeRef = useRef(1);
   const roomRef = useRef<Room | null>(null);
   const audioHostRef = useRef<HTMLDivElement>(null);
+
+  const friendsQuery = useQuery({
+    ...friendsOptions,
+    enabled: Boolean(user),
+    refetchInterval: 5000,
+  });
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`call-invites-${user.id}-${crypto.randomUUID()}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'friend_call_members', filter: `user_id=eq.${user.id}` },
+        () => {
+          void cache.invalidateQueries({ queryKey: ['friends'] });
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id, cache]);
+
+  const canCall = Boolean(friendsQuery.data?.callProviderAvailable);
+  const incomingCall = !activeCall
+    ? (friendsQuery.data?.calls ?? []).find((c) => c.myState === 'invited')
+    : undefined;
+
+  useEffect(() => {
+    if (!incomingCall || !canCall) return;
+    const stop = startRingtone();
+    return stop;
+  }, [incomingCall?.id, canCall]);
 
   const applyVolumeToElements = (volume: number) => {
     const host = audioHostRef.current;
@@ -105,8 +204,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setActiveCall({ callId: payload.callId, muted: micMuted, participants: room.remoteParticipants.size + 1 });
   }
 
-  async function beginCall(friendIds: string[], canCall: boolean) {
-    if (!canCall || !friendIds.length) return;
+  async function beginCall(friendIds: string[], providerReady: boolean) {
+    if (!providerReady || !friendIds.length) return;
     setBusy(true);
     try {
       const payload = await startCallFn({ data: { friendIds } });
@@ -120,8 +219,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function joinCall(callId: string, canCall: boolean) {
-    if (!canCall) return;
+  async function joinCall(callId: string, providerReady: boolean) {
+    if (!providerReady) return;
     setBusy(true);
     try {
       const payload = await joinCallFn({ data: { callId } });
@@ -165,6 +264,44 @@ export function CallProvider({ children }: { children: ReactNode }) {
     >
       {children}
       <div ref={audioHostRef} className="hidden" aria-hidden="true" />
+      {incomingCall && canCall && (
+        <aside className="incoming-call-alert" role="alertdialog" aria-label={t('Appel entrant')}>
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <span className="incoming-call-ring">
+              <PhoneIncoming size={18} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                {t('Appel entrant')}
+              </p>
+              <p className="text-sm font-medium truncate">
+                {incomingCall.members.map((m) => m.display_name).join(', ')}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              size="sm"
+              className="flex-1 sm:flex-initial"
+              disabled={busy}
+              onClick={() => void joinCall(incomingCall.id, canCall)}
+            >
+              <Phone size={15} />
+              {t('Rejoindre')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 sm:flex-initial"
+              disabled={busy}
+              onClick={() => void hangUp(incomingCall.id, 'declined')}
+            >
+              <X size={15} />
+              {t('Refuser')}
+            </Button>
+          </div>
+        </aside>
+      )}
       {activeCall && (
         <aside className="floating-call-bar" aria-label={t('Appel en cours')}>
           <div className="flex items-center gap-2 text-xs font-medium">
@@ -221,4 +358,3 @@ export function useCall() {
   if (!ctx) throw new Error('useCall must be used within CallProvider');
   return ctx;
 }
-
