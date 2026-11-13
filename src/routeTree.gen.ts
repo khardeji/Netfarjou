@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as MatchsRouteImport } from './routes/matchs'
 import { Route as MesSeancesRouteImport } from './routes/mes-seances'
 import { Route as PropositionsRouteImport } from './routes/propositions'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -33,6 +34,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MatchsRoute = MatchsRouteImport.update({
+  id: '/matchs',
+  path: '/matchs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MesSeancesRoute = MesSeancesRouteImport.update({
@@ -79,6 +85,7 @@ const AuthenticatedSalleIdRoute = AuthenticatedSalleIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/matchs': typeof MatchsRoute
   '/mes-seances': typeof MesSeancesRoute
   '/propositions': typeof PropositionsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/matchs': typeof MatchsRoute
   '/mes-seances': typeof MesSeancesRoute
   '/propositions': typeof PropositionsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/matchs': typeof MatchsRoute
   '/mes-seances': typeof MesSeancesRoute
   '/propositions': typeof PropositionsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -119,6 +128,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/matchs'
     | '/mes-seances'
     | '/propositions'
     | '/reset-password'
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/matchs'
     | '/mes-seances'
     | '/propositions'
     | '/reset-password'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/matchs'
     | '/mes-seances'
     | '/propositions'
     | '/reset-password'
@@ -158,6 +170,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  MatchsRoute: typeof MatchsRoute
   MesSeancesRoute: typeof MesSeancesRoute
   PropositionsRoute: typeof PropositionsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -186,6 +199,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/matchs': {
+      id: '/matchs'
+      path: '/matchs'
+      fullPath: '/matchs'
+      preLoaderRoute: typeof MatchsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mes-seances': {
@@ -266,6 +286,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  MatchsRoute: MatchsRoute,
   MesSeancesRoute: MesSeancesRoute,
   PropositionsRoute: PropositionsRoute,
   ResetPasswordRoute: ResetPasswordRoute,

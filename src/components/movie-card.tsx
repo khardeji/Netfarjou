@@ -8,7 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import { cancelScreeningRegistration, registerForScreening } from '@/lib/cinema.functions';
-import { canRegister, formatDate, posters, statusLabel } from '@/lib/cinema';
+import { canRegister, formatDate, isMatchGenre, posters, statusLabel } from '@/lib/cinema';
 import { liveEnded, minutesSinceStart, roomIsOpen, youtubeEmbed, youtubeId } from '@/lib/room';
 import type { Screening } from '@/lib/cinema.queries';
 import { useAuth } from './auth-context';
@@ -29,8 +29,9 @@ export function MovieCard({ session, registered = false }: {
     const [trailer, setTrailer] = useState(false);
     if (!movie)
         return null;
+    const isMatch = isMatchGenre(movie.genre);
     const isLive = session.status === 'Live' && !liveEnded(session.starts_at, movieSeconds(movie) / 60, Date.now());
-    const liveNote = isLive ? <p className="live-note"><span className="live-dot" />{t("Le film a commenc\u00E9 il y a")} {minutesSinceStart(session.starts_at, Date.now()) < 1 ? `${Math.max(0, Math.floor((Date.now() - Date.parse(session.starts_at)) / 1000))} s` : `${minutesSinceStart(session.starts_at, Date.now())} ${t("min")}`}{user ? '' : ` · ${t("Connectez-vous d\u2019abord pour entrer")}`}</p> : null;
+    const liveNote = isLive ? <p className="live-note"><span className="live-dot" />{isMatch ? t("Le match a commencé il y a") : t("Le film a commencé il y a")} {minutesSinceStart(session.starts_at, Date.now()) < 1 ? `${Math.max(0, Math.floor((Date.now() - Date.parse(session.starts_at)) / 1000))} s` : `${minutesSinceStart(session.starts_at, Date.now())} ${t("min")}`}{user ? '' : ` · ${t("Connectez-vous d\u2019abord pour entrer")}`}</p> : null;
     const open = canRegister(session.status, session.registration_opens_at, session.registration_closes_at, session.participant_count, session.capacity);
     const trailerId = youtubeId(movie?.trailer_url);
     const roomLink = (isLive && user) || (registered && session.status === 'Waiting Room') ? <Button asChild size="sm"><Link to="/salle/$id" params={{ id: session.id }}><Play />{t("Entrer dans la salle")}</Link></Button>  : isLive && !user ? <Button asChild size="sm"><Link to="/auth"><Play />{t("Se connecter")}</Link></Button> : null;

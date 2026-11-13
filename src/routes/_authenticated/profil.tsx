@@ -1,20 +1,20 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useServerFn } from '@tanstack/react-start';
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Room, RoomEvent, Track } from 'livekit-client';
 import { Copy, UserPlus, Users, Check, X, Phone, PhoneOff, Mic, MicOff, ShieldCheck, RefreshCw, Film, Play, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useCall } from '@/components/call-context';
 import { formatDate, headMeta, statusLabel } from '@/lib/cinema';
 import { catalogueOptions } from '@/lib/cinema.queries';
 import { cancelScreeningRegistration } from '@/lib/cinema.functions';
 import { supabase } from '@/integrations/supabase/client';
 import { t } from '@/lib/i18n';
 import { friendsOptions } from '@/lib/friends.queries';
-import { addFriend, joinFriendCall, respondFriend, respondFriendCall, startFriendCall } from '@/lib/friends.functions';
+import { addFriend, respondFriend } from '@/lib/friends.functions';
 import { friendCodeSchema } from '@/lib/friends';
 
 export const Route = createFileRoute('/_authenticated/profil')({
@@ -38,113 +38,22 @@ function Profile() {
   const cache = useQueryClient();
   const request = useServerFn(addFriend);
   const respond = useServerFn(respondFriend);
-  const startCallFn = useServerFn(startFriendCall);
-  const joinCallFn = useServerFn(joinFriendCall);
-  const respondCallFn = useServerFn(respondFriendCall);
   const cancelRegistration = useServerFn(cancelScreeningRegistration);
+  const { activeCall, busy: callBusy, beginCall: beginCallCtx, joinCall: joinCallCtx, toggleMute, hangUp } = useCall();
   const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [localBusy, setLocalBusy] = useState(false);
+  const busy = localBusy || callBusy;
+  const setBusy = setLocalBusy;
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const [activeCall, setActiveCall] = useState<{ callId: string; muted: boolean; participants: number } | null>(null);
-  const roomRef = useRef<Room | null>(null);
-  const audioHostRef = useRef<HTMLDivElement>(null);
   const profile = data.profile;
   const friendships = data.friendships ?? [];
   const accepted = friendships.filter(f => f.status === 'accepted');
   const pending = friendships.filter(f => f.status === 'pending');
   const canCall = Boolean(data.callProviderAvailable);
   const incomingCalls = (data.calls ?? []).filter(c => c.id !== activeCall?.callId);
-
-  useEffect(() => {
-    return () => {
-      if (roomRef.current) {
-        void roomRef.current.disconnect();
-        roomRef.current = null;
-      }
-      if (audioHostRef.current) audioHostRef.current.innerHTML = '';
-    };
-  }, []);
-
-  async function connectToCall(payload: { callId: string; url: string; token: string }) {
-    if (roomRef.current) {
-      await roomRef.current.disconnect();
-      roomRef.current = null;
-    }
-    if (audioHostRef.current) audioHostRef.current.innerHTML = '';
-    const room = new Room();
-    room.on(RoomEvent.TrackSubscribed, track => {
-      if (track.kind === Track.Kind.Audio && audioHostRef.current) {
-        audioHostRef.current.appendChild(track.attach());
-      }
-    });
-    room.on(RoomEvent.TrackUnsubscribed, track => {
-      track.detach().forEach(el => el.remove());
-    });
-    const syncCount = () => {
-      setActiveCall(prev => prev ? { ...prev, participants: room.remoteParticipants.size + 1 } : prev);
-    };
-    room.on(RoomEvent.ParticipantConnected, syncCount);
-    room.on(RoomEvent.ParticipantDisconnected, syncCount);
-    await room.connect(payload.url, payload.token);
-    await room.localParticipant.setMicrophoneEnabled(true);
-    roomRef.current = room;
-    setActiveCall({ callId: payload.callId, muted: false, participants: room.remoteParticipants.size + 1 });
-  }
-
-  async function beginCall(friendIds: string[]) {
-    if (!canCall || !friendIds.length) return;
-    setBusy(true);
-    try {
-      const payload = await startCallFn({ data: { friendIds } });
-      await connectToCall(payload);
-      await cache.invalidateQueries({ queryKey: ['friends'] });
-      toast.success(t('Appel démarré'));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('Impossible de démarrer l’appel.'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function joinCall(callId: string) {
-    if (!canCall) return;
-    setBusy(true);
-    try {
-      const payload = await joinCallFn({ data: { callId } });
-      await connectToCall(payload);
-      await cache.invalidateQueries({ queryKey: ['friends'] });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('Impossible de rejoindre l’appel.'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function toggleMute() {
-    if (!roomRef.current || !activeCall) return;
-    const nextMuted = !activeCall.muted;
-    await roomRef.current.localParticipant.setMicrophoneEnabled(!nextMuted);
-    setActiveCall({ ...activeCall, muted: nextMuted });
-  }
-
-  async function hangUp(callId: string, state: 'left' | 'declined' = 'left') {
-    setBusy(true);
-    try {
-      if (activeCall?.callId === callId && roomRef.current) {
-        await roomRef.current.disconnect();
-        roomRef.current = null;
-        if (audioHostRef.current) audioHostRef.current.innerHTML = '';
-        setActiveCall(null);
-      }
-      await respondCallFn({ data: { callId, state } });
-      await cache.invalidateQueries({ queryKey: ['friends'] });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('Impossible de quitter l’appel.'));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const beginCall = (friendIds: string[]) => beginCallCtx(friendIds, canCall);
+  const joinCall = (callId: string) => joinCallCtx(callId, canCall);
   const catalogue = useQuery(catalogueOptions);
   const mine = useQuery({
     queryKey: ['my-sessions', profile?.id],
@@ -206,7 +115,6 @@ function Profile() {
         </section>
       </div>
       <section className="friends-section"><div className="flex items-start justify-between gap-3 flex-wrap"><h2><Users size={20}/>{t('Mes amis')}<span className="friend-count">{accepted.length}</span></h2><Button disabled={!canCall || !selected.length || busy || !!activeCall} variant="outline" size="sm" onClick={() => { const friendUserIds = accepted.filter(f => selected.includes(f.id)).map(f => f.peer?.id).filter((id): id is string => Boolean(id)); void beginCall(friendUserIds); }}><Phone size={15}/>{t('Appel de groupe')}{selected.length > 0 && ` (${selected.length})`}</Button></div>
-        <div ref={audioHostRef} className="hidden" aria-hidden="true" />
         {activeCall && (
           <div className="friend-row" role="status">
             <div className="min-w-0 flex-1">

@@ -9,6 +9,7 @@ import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { ensureProfile } from '@/lib/cinema.functions';
 import { AuthContext } from '@/components/auth-context';
+import { CallProvider } from '@/components/call-context';
 import { CinemaHeader } from '@/components/cinema-header';
 import { Toaster } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -128,10 +129,12 @@ function RootComponent() {
     }, [router, queryClient]);
     return (<I18nextProvider i18n={i18n}><QueryClientProvider client={queryClient}>
       <AuthContext.Provider value={auth}>
-        <CinemaHeader />
-        <Outlet />
-        <footer className="site-footer content-width"><Link to="/" className="footer-brand"><BrandLogo /></Link><div className="footer-details"><span>{t("Le cin\u00E9ma, ensemble.")}</span><span>© 2026 Netfarjou</span></div></footer>
-        <Toaster theme="dark" richColors/>
+        <CallProvider>
+          <CinemaHeader />
+          <Outlet />
+          <footer className="site-footer content-width"><Link to="/" className="footer-brand"><BrandLogo /></Link><div className="footer-details"><span>{t("Le cin\u00E9ma, ensemble.")}</span><span>© 2026 Netfarjou</span></div></footer>
+          <Toaster theme="dark" richColors/>
+        </CallProvider>
       </AuthContext.Provider>
     </QueryClientProvider></I18nextProvider>);
 }

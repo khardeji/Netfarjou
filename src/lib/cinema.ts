@@ -4,6 +4,9 @@ import minuit from '@/assets/minuit-poster.jpg';
 import sommets from '@/assets/sommets-poster.jpg';
 
 export const posters: Record<string, string> = { horizon, minuit, sommets };
+export const MATCH_GENRE = 'Match';
+export const FILM_GENRES = ['Drame', 'Comédie', 'Science-Fiction', 'Documentaire', 'Animation', 'Action', 'Thriller', MATCH_GENRE];
+export function isMatchGenre(genre?: string | null) { return genre?.trim().toLowerCase() === 'match'; }
 export const statusLabels: Record<string, string> = { Upcoming: 'Prochainement', 'Registration Open': 'Inscriptions ouvertes', 'Waiting Room': 'Salon ouvert', Live: 'En direct', Finished: 'Terminée', Cancelled: 'Annulée' };
 export function statusLabel(status: string) { return statusLabels[status] ?? status; }
 export function formatDate(value: string) { return new Intl.DateTimeFormat(i18n.language === 'ar-TN' ? 'ar-TN' : i18n.language === 'en' ? 'en-GB' : 'fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
