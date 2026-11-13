@@ -53,8 +53,18 @@ export const cancelScreeningRegistration = createServerFn({ method: 'POST' })
   });
 
 export const getCatalogue = createServerFn({ method: 'GET' }).handler(async () => {
-  const key = process.env['SUPABASE_PUBLISHABLE_KEY']!;
-  const client = createClient<Database>(process.env['SUPABASE_URL']!, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: (input, init) => { const headers = new Headers(init?.headers); if (key.startsWith('sb_') && headers.get('Authorization') === `Bearer ${key}`) headers.delete('Authorization'); headers.set('apikey', key); return fetch(input, { ...init, headers }); } } });
+  const url =
+    process.env['SUPABASE_URL'] ||
+    process.env['VITE_SUPABASE_URL'] ||
+    import.meta.env['VITE_SUPABASE_URL'];
+  const key =
+    process.env['SUPABASE_PUBLISHABLE_KEY'] ||
+    process.env['VITE_SUPABASE_PUBLISHABLE_KEY'] ||
+    import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'];
+  if (!url || !key) {
+    throw new Error('Configuration Supabase manquante (SUPABASE_URL / VITE_SUPABASE_URL).');
+  }
+  const client = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: (input, init) => { const headers = new Headers(init?.headers); if (key.startsWith('sb_') && headers.get('Authorization') === `Bearer ${key}`) headers.delete('Authorization'); headers.set('apikey', key); return fetch(input, { ...init, headers }); } } });
   const [sessions, counts] = await Promise.all([client.from('screenings').select('*, movies(*)').order('starts_at'), client.rpc('screening_counts')]);
   if (sessions.error) throw new Error('La programmation est momentanément indisponible.');
   if (counts.error) throw new Error('Les places disponibles sont momentanément indisponibles.');

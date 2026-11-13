@@ -13,7 +13,6 @@ import { CinemaHeader } from '@/components/cinema-header';
 import { Toaster } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 function NotFoundComponent() {
  useTranslation();
     return (<div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -31,9 +30,6 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
  useTranslation();
     console.error(error);
     const router = useRouter();
-    useEffect(() => {
-        reportLovableError(error, { boundary: "tanstack_root_error_component" });
-    }, [error]);
     return (<div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">{t("This page didn't load")}</h1>
