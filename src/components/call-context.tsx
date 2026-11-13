@@ -6,6 +6,7 @@ import { Mic, MicOff, Phone, PhoneIncoming, PhoneOff, Volume2, X } from 'lucide-
 import { toast } from 'sonner';
 import { useAuth } from '@/components/auth-context';
 import { Button } from '@/components/ui/button';
+import { CallHelpDialog, CallUnsupportedError, detectCallSupport, type CallSupport } from '@/components/call-help-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { joinFriendCall, respondFriendCall, startFriendCall } from '@/lib/friends.functions';
 import { friendsOptions } from '@/lib/friends.queries';
@@ -103,6 +104,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const callVolumeRef = useRef(1);
   const roomRef = useRef<Room | null>(null);
   const connectedAtRef = useRef(0);
+  const [helpReason, setHelpReason] = useState<CallSupport | null>(null);
+
+  /** Checks WebRTC/microphone support before touching the server; opens the help dialog when blocked. */
+  function ensureCallSupport() {
+    const support = detectCallSupport();
+    if (support !== 'ok') setHelpReason(support);
+    return support === 'ok';
+  }
   const audioHostRef = useRef<HTMLDivElement>(null);
 
   const friendsQuery = useQuery({
@@ -165,20 +174,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function connectToCall(payload: { callId: string; url: string; token: string }) {
-    if (typeof window !== 'undefined') {
-      const hasWebRtc = Boolean(window.RTCPeerConnection || (window as unknown as { webkitRTCPeerConnection?: unknown }).webkitRTCPeerConnection);
-      if (!hasWebRtc) {
-        const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-        throw new Error(
-          isIos
-            ? t('Votre iPhone bloque les appels (Mode d’isolement activé). Dans Safari, touchez « aA » › Réglages du site web › désactivez « Mode d’isolement » pour netfarjou.vercel.app, puis rechargez la page.')
-            : t('Les appels vocaux ne sont pas supportés dans ce navigateur. Ouvrez le site dans Safari ou Chrome.'),
-        );
-      }
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error(t('Le microphone est indisponible : ouvrez le site en HTTPS dans Safari ou Chrome.'));
-      }
-    }
+    if (!ensureCallSupport()) throw new CallUnsupportedError();
     if (roomRef.current) {
       await roomRef.current.disconnect();
       roomRef.current = null;
@@ -250,6 +246,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   async function beginCall(friendIds: string[], providerReady: boolean) {
     if (!providerReady || !friendIds.length) return;
+    if (!ensureCallSupport()) return;
     setBusy(true);
     try {
       const payload = await startCallFn({ data: { friendIds } });
@@ -257,7 +254,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       await cache.invalidateQueries({ queryKey: ['friends'] });
       toast.success(t('Appel démarré'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('Impossible de démarrer l’appel.'));
+      if (!(e instanceof CallUnsupportedError)) toast.error(e instanceof Error ? e.message : t('Impossible de démarrer l’appel.'));
     } finally {
       setBusy(false);
     }
@@ -265,13 +262,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   async function joinCall(callId: string, providerReady: boolean) {
     if (!providerReady) return;
+    if (!ensureCallSupport()) return;
     setBusy(true);
     try {
       const payload = await joinCallFn({ data: { callId } });
       await connectToCall(payload);
       await cache.invalidateQueries({ queryKey: ['friends'] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('Impossible de rejoindre l’appel.'));
+      if (!(e instanceof CallUnsupportedError)) toast.error(e instanceof Error ? e.message : t('Impossible de rejoindre l’appel.'));
     } finally {
       setBusy(false);
     }
@@ -307,6 +305,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       value={{ activeCall, busy, callVolume, setCallVolume, beginCall, joinCall, toggleMute, hangUp }}
     >
       {children}
+      <CallHelpDialog open={helpReason !== null} onOpenChange={(open) => { if (!open) setHelpReason(null); }} reason={helpReason ?? 'blocked'} />
       <div ref={audioHostRef} className="hidden" aria-hidden="true" />
       {incomingCall && canCall && (
         <aside className="incoming-call-alert" role="alertdialog" aria-label={t('Appel entrant')}>
