@@ -8,3 +8,4 @@ export const footballMatchesOptions = (day: MatchDayFilter = 'today') =>
     staleTime: 45_000,
     refetchInterval: 60_000,
   });
+
