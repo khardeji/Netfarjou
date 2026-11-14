@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, CalendarDays, Play, Radio, Trophy, Users } from 'lucide-react';
 import { useAuth } from '@/components/auth-context';
+import { FootballScoreboard } from '@/components/football-scoreboard';
 import { MovieCard } from '@/components/movie-card';
 import { Button } from '@/components/ui/button';
 import { formatDate, isMatchGenre } from '@/lib/cinema';
@@ -37,8 +38,6 @@ export function MatchSection({
                 : 4;
       return rank(a.status) - rank(b.status);
     });
-
-  if (compact && !matches.length) return null;
 
   const liveMatch = matches.find(
     (s) => s.status === 'Live' && !liveEnded(s.starts_at, movieSeconds(s.movies) / 60, Date.now()),
@@ -127,6 +126,10 @@ export function MatchSection({
           ))}
         </div>
       )}
+
+      <div className="mt-8">
+        <FootballScoreboard sessions={sessions} compact={compact} />
+      </div>
     </section>
   );
 }

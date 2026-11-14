@@ -4,6 +4,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { Play, Radio, Trophy } from 'lucide-react';
 import { useAuth } from '@/components/auth-context';
+import { FootballScoreboard } from '@/components/football-scoreboard';
 import { MovieCard } from '@/components/movie-card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -174,6 +175,11 @@ function MatchesPage() {
           )}
         </div>
       )}
+
+      <section className="mt-10" aria-label={t('Calendrier des matchs en direct')}>
+        <h2 className="text-xl font-semibold mb-4">{t('Calendrier & scores en direct')}</h2>
+        <FootballScoreboard sessions={sessions} />
+      </section>
     </main>
   );
 }
