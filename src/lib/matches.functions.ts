@@ -53,8 +53,9 @@ export const getLiveFootballMatches = createServerFn({ method: 'GET' })
     }
 
     const offset = data.day === 'yesterday' ? -1 : data.day === 'tomorrow' ? 1 : 0;
-    const dateStr = isoDateOffset(offset);
-    const url = `https://api.football-data.org/v4/matches?dateFrom=${dateStr}&dateTo=${dateStr}`;
+    const dateFrom = isoDateOffset(offset);
+    const dateTo = isoDateOffset(offset + 1);
+    const url = `https://api.football-data.org/v4/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
 
     try {
       const response = await fetch(url, {
