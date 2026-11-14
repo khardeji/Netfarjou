@@ -64,7 +64,7 @@ export function FootballScoreboard({
 }) {
   useTranslation();
   const { user } = useAuth();
-  const [day, setDay] = useState<MatchDayFilter>('week');
+  const [day, setDay] = useState<MatchDayFilter>('today');
   const query = useQuery(footballMatchesOptions(day));
 
   if (query.data && !query.data.available) return null;
