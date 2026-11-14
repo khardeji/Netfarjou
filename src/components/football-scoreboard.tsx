@@ -16,8 +16,13 @@ type MatchScreeningLink = {
   movies: { genre: string; title: string } | null;
 };
 
-function formatMatchTime(utcDate: string) {
-  return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(utcDate));
+function formatMatchTime(utcDate: string, includeDate = false) {
+  return new Intl.DateTimeFormat(
+    'fr-FR',
+    includeDate
+      ? { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }
+      : { hour: '2-digit', minute: '2-digit' },
+  ).format(new Date(utcDate));
 }
 
 function matchStatusInfo(status: string, minute?: number | null) {
@@ -59,7 +64,7 @@ export function FootballScoreboard({
 }) {
   useTranslation();
   const { user } = useAuth();
-  const [day, setDay] = useState<MatchDayFilter>('today');
+  const [day, setDay] = useState<MatchDayFilter>('week');
   const query = useQuery(footballMatchesOptions(day));
 
   if (query.data && !query.data.available) return null;
@@ -75,6 +80,7 @@ export function FootballScoreboard({
             { id: 'yesterday', label: 'Hier' },
             { id: 'today', label: 'Aujourd’hui' },
             { id: 'tomorrow', label: 'Demain' },
+            { id: 'week', label: 'Prochains jours' },
           ].map((item) => (
             <Button
               key={item.id}
@@ -131,7 +137,7 @@ export function FootballScoreboard({
                     <strong className="scoreboard-score">
                       {hasScore
                         ? `${m.score.fullTime.home} - ${m.score.fullTime.away}`
-                        : formatMatchTime(m.utcDate)}
+                        : formatMatchTime(m.utcDate, day === 'week')}
                     </strong>
                     <span className={info.live ? 'scoreboard-pill scoreboard-pill-live' : 'scoreboard-pill'}>
                       {info.live && <span className="live-dot" />}

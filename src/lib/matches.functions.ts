@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 
-export type MatchDayFilter = 'yesterday' | 'today' | 'tomorrow';
+export type MatchDayFilter = 'yesterday' | 'today' | 'tomorrow' | 'week';
 
 export type FootballMatch = {
   id: number;
@@ -45,16 +45,27 @@ const STATUS_PRIORITY: Record<string, number> = {
 };
 
 export const getLiveFootballMatches = createServerFn({ method: 'GET' })
-  .inputValidator((input) => z.object({ day: z.enum(['yesterday', 'today', 'tomorrow']).default('today') }).parse(input ?? {}))
+  .inputValidator((input) => z.object({ day: z.enum(['yesterday', 'today', 'tomorrow', 'week']).default('today') }).parse(input ?? {}))
   .handler(async ({ data }): Promise<{ available: boolean; matches: FootballMatch[]; error?: string }> => {
     const apiKey = process.env['FOOTBALL_DATA_API_KEY']?.trim();
     if (!apiKey) {
       return { available: false, matches: [] };
     }
 
-    const offset = data.day === 'yesterday' ? -1 : data.day === 'tomorrow' ? 1 : 0;
-    const dateFrom = isoDateOffset(offset);
-    const dateTo = isoDateOffset(offset + 1);
+    const dateFrom =
+      data.day === 'yesterday'
+        ? isoDateOffset(-1)
+        : data.day === 'tomorrow'
+          ? isoDateOffset(1)
+          : isoDateOffset(0);
+    const dateTo =
+      data.day === 'yesterday'
+        ? isoDateOffset(0)
+        : data.day === 'tomorrow'
+          ? isoDateOffset(2)
+          : data.day === 'week'
+            ? isoDateOffset(10)
+            : isoDateOffset(1);
     const url = `https://api.football-data.org/v4/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
 
     try {
